@@ -209,7 +209,15 @@ if "chat_session" not in st.session_state:
         gemini_history.append({"role": m["role"], "parts": [m["content"]]})
     st.session_state.chat_session = model.start_chat(history=gemini_history)
 
+# SIMPLE USER MEMORY AND PANTRY
+if "pantry" not in st.session_state:
+    st.session_state.pantry = []
 
+if "priority" not in st.session_state:
+    st.session_state.priority = ""
+
+if "info" not in st.session_state:
+    st.session_state.info = ""
 
 # --- SIDEBAR UI ---
 with st.sidebar:
@@ -248,11 +256,40 @@ if prompt := st.chat_input("What's in your fridge?"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # SIMPLE MEMORY / PANTRY UPDATE
+    # -------------------------------
+    text = prompt.lower()
+
+    # store ingredients
+    if "i have" in text:
+        items = text.replace("i have", "")
+        st.session_state.pantry += [i.strip() for i in items.split(",")]
+
+    # detect expiring item
+    if "expire" in text or "going bad" in text:
+        st.session_state.priority = prompt
+
+    # store any extra info (budget, diet, allergies)
+    if "budget" in text or "vegetarian" in text or "allergic" in text:
+        st.session_state.info = prompt
+
     # Generate AI Response
     with st.chat_message("assistant"):
         with st.spinner("Thinking of a recipe..."):
             try:
-                response = st.session_state.chat_session.send_message(prompt)
+                extra = f"""
+                User info: {st.session_state.info}
+                Ingredients: {st.session_state.pantry}
+                Priority item: {st.session_state.priority}
+
+                Rules:
+                - Use available ingredients first
+                - Mention missing ingredients clearly
+                - If missing items, ask for budget before shopping list
+                - Focus on priority ingredient if given
+                """
+
+                response = st.session_state.chat_session.send_message(extra + "\n\n" + prompt)
                 full_response = response.text
 
                 st.markdown(full_response)
