@@ -1,38 +1,122 @@
+import streamlit as st
 import google.generativeai as genai
 import os
-from dotenv import load_dotenv
 import json
+from dotenv import load_dotenv
 
+# --- CONFIGURATION & SETUP ---
+st.set_page_config(page_title="Chef AI-XORA", page_icon="🍳", layout="centered")
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
-
 FILE_NAME = "chat_memory.json"
 
+# Custom CSS for Chat Bubbles and UI
+st.markdown("""
+<style>
+
+/* --- GLOBAL APP --- */
+.main {
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
+
+/* --- CENTER CHAT CONTAINER --- */
+.block-container {
+    max-width: 750px;
+    padding-top: 2rem;
+}
+
+/* --- CHAT BUBBLES --- */
+.stChatMessage {
+    padding: 0;
+    margin-bottom: 12px;
+}
+
+[data-testid="stChatMessageContent"] {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.5;
+    max-width: 85%;
+}
+
+/* USER MESSAGE */
+[data-testid="stChatMessage"][data-testid*="user"] [data-testid="stChatMessageContent"] {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+}
+
+/* AI MESSAGE */
+[data-testid="stChatMessage"][data-testid*="assistant"] [data-testid="stChatMessageContent"] {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-bottom-left-radius: 4px;
+}
+
+/* --- SIDEBAR --- */
+section[data-testid="stSidebar"] {
+    background: #0f172a;
+    border-right: 1px solid #e5e7eb;
+}
+
+/* --- BUTTON --- */
+.stButton button {
+    border-radius: 10px;
+    padding: 10px;
+    border: none;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    font-weight: 500;
+}
+
+.stButton button:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+/* --- INPUT BOX --- */
+.stChatInput input {
+    border-radius: 12px !important;
+}
+
+/* --- TITLE --- */
+h1 {
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* --- SUBTLE CARD EFFECT --- */
+[data-testid="stChatMessageContent"] {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+/* --- REMOVE FOOTER --- */
+footer {visibility: hidden;}
+
+</style>
+""", unsafe_allow_html=True)
+
+# --- BACKEND LOGIC ---
 def load_data():
-    if os.path.exists(FILE_NAME):
-        if os.path.getsize(FILE_NAME) > 0:
-            with open(FILE_NAME, "r") as f:
-                return json.load(f)
-        return []
+    if os.path.exists(FILE_NAME) and os.path.getsize(FILE_NAME) > 0:
+        with open(FILE_NAME, "r") as f:
+            return json.load(f)
+    return []
 
 def save_data(chat_history):
     new_memory = []
     for message in chat_history:
-        message_text = message.parts[0].text
+        # Gemini history objects have 'role' and 'parts'
         new_memory.append({
             "role": message.role,
-            "parts": [{
-                "text": message_text
-            }]
+            "parts": [{"text": message.parts[0].text}]
         })
+    with open(FILE_NAME, "w") as f:
+        json.dump(new_memory, f, indent=4)
 
-        with open(FILE_NAME, "w") as f:
-            json.dump(new_memory, f, indent=4)
-
-
-genai.configure(api_key=api_key)
-
-instructions = """You are Chef AI-Xora — a smart, practical kitchen assistant.
+# Initialize Gemini
+if api_key:
+    genai.configure(api_key=api_key)
+    instructions = """You are Chef AI-Xora — a smart, practical kitchen assistant.
 
 You speak like a real person: natural, slightly warm, and thoughtful.
 Avoid sounding robotic, but also avoid being too brief.
@@ -51,76 +135,151 @@ Do not repeat or re-ask unless needed.
 
 2. Rescue First
 If an ingredient is about to expire, prioritize it.
-Build the meal around it in a natural way.
+Build the meal around it naturally.
 
 3. Think Before Suggesting
 Use available ingredients first.
 Avoid unnecessary additions.
 
 4. Budget Awareness
-If needed, ask briefly for budget.
+If a shopping list is needed and budget is unknown, ask briefly.
 When given:
 • Keep suggestions realistic
 • Avoid waste
 • Prefer flexible ingredients
 
 5. Smart Shopping
-Only include missing ingredients.
+Only include missing items.
 Keep quantities practical and budget-aware.
 
-6. Natural Flow
-Write like a person helping in the kitchen.
-Not rigid, not robotic — but still clear and structured when needed.
+6. Special Case: Missing Ingredients / No Inventory (IMPORTANT)
+
+If the user:
+• says they don’t have ingredients
+• OR says they are missing items for a recipe
+• OR says “I want to make this but I don’t have things”
+
+Then you MUST:
+
+Step 1:
+Ask (in a natural, short way):
+• What is your budget (Rs)?
+• How many people are you cooking for?
+
+Do NOT generate a shopping list yet.
+
+Step 2:
+After the user answers:
+• Generate a complete shopping list based on:
+  - the recipe
+  - number of people
+  - budget
+
+• Adjust quantities to fit the budget
+• Prioritize essential ingredients first
+• Suggest cheaper alternatives if needed
 
 7. Recipe Output Format (IMPORTANT)
 
-Whenever you suggest a dish, you MUST include a clean Markdown table like this:
+Whenever suggesting a dish, include a clean Markdown table:
 
 | Ingredients | Time | Calories |
 |------------|------|----------|
-| ingredient list (combined) | total cooking time | estimated calories |
+| ingredient list | total time | estimated calories per serving |
 
-Rules:
-• Ingredients should be listed clearly in one cell (comma-separated or short list)
-• Time should be realistic (e.g., 20 mins)
-• Calories should be an approximate total per serving
-• Keep it neat and readable
+Keep it neat and readable.
 
-After the table, you can briefly explain steps if needed.
+8. Natural Flow
+Write like a person helping in the kitchen.
+Not rigid, not robotic.
 
-8. Keep It Useful
+9. Keep It Useful
 Avoid extremely short answers.
-Avoid unnecessary long paragraphs.
-Aim for a helpful middle ground.
+Avoid long unnecessary explanations.
 
-9. Reduce Waste
-Encourage using leftovers and smart reuse of ingredients.
+10. Reduce Waste
+Encourage reuse, leftovers, and smart ingredient usage.
 
-10. Ask Only When Needed
-Ask short, natural follow-ups if something important is missing.
+11. Ask Only When Needed
+Ask short, natural follow-ups if required.
 
-11. Stay in Role
+12. Stay in Role
 If the user asks something unrelated:
-Respond briefly and politely, then return focus to kitchen-related help.
-Do not go deep into unrelated topics.
+Reply briefly and politely, then return focus to kitchen help.
 
 Most importantly:
-Be human, be practical, and actually help the user cook smarter."""
+Be human, be practical, and help the user cook smarter within their means."""
 
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite", system_instruction=instructions)
+else:
+    st.error("API Key not found. Please check your .env file.")
 
-model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite", system_instruction=instructions)
+# --- SESSION STATE MANAGEMENT ---
+if "messages" not in st.session_state:
+    saved_history = load_data()
+    # Convert JSON format to Streamlit-friendly format
+    st.session_state.messages = [{"role": m["role"], "content": m["parts"][0]["text"]} for m in saved_history]
 
-memory = load_data()
-chat = model.start_chat(history=memory)
+if "chat_session" not in st.session_state:
+    # Convert JSON history back to Gemini format for the chat object
+    gemini_history = []
+    for m in st.session_state.messages:
+        gemini_history.append({"role": m["role"], "parts": [m["content"]]})
+    st.session_state.chat_session = model.start_chat(history=gemini_history)
 
-print("------- Your Chef AI-XORA Agent is Online! (Type 'exit' or 'bye' to quit.) -------")
+# --- SIDEBAR UI ---
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/1830/1830839.png", width=100)
+    st.title("Chef AI-XORA")
+    st.markdown("**Strategic Kitchen Assistant**")
+    st.divider()
+    
+    st.info("I help you reduce waste, stay on budget, and cook delicious meals with what's already in your fridge.")
+    
+    if st.button("🗑️ Clear Chat History", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.chat_session = model.start_chat(history=[])
+        if os.path.exists(FILE_NAME):
+            os.remove(FILE_NAME)
+        st.rerun()
+    
+    st.divider()
+    st.caption("Developed & Deployed by:")
+    st.markdown("**Dua Noor**")
 
-while True:
-    user_input = input("User: ")
-    if user_input in ["exit", "bye", "quit"]:
-        save_data(chat.history)
-        print("Progress Saved. Goodbye!")
-        break
+# --- MAIN CHAT INTERFACE ---
+st.title("🍳 Chef AI-XORA")
+st.caption("Your personalized culinary co-pilot.")
 
-    response = chat.send_message(user_input)
-    print("Agent:", response.text)
+# Display Chat History
+for message in st.session_state.messages:
+    role_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# User Input
+if prompt := st.chat_input("What's in your fridge?"):
+    # Add User Message
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generate AI Response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking of a recipe..."):
+            try:
+                response = st.session_state.chat_session.send_message(prompt)
+                full_response = response.text
+                
+                st.markdown(full_response)
+                
+                # Add to State and Save
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                save_data(st.session_state.chat_session.history)
+                
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+
+# --- FOOTER ---
+st.markdown("---")
+st.caption("Tip: Tell Xora about your allergies or food waste goals for better suggestions.")
