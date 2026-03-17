@@ -7,10 +7,12 @@ from dotenv import load_dotenv
 # --- CONFIGURATION & SETUP ---
 st.set_page_config(page_title="Chef AI-XORA", page_icon="🍳", layout="centered")
 load_dotenv()
+
 api_key = os.getenv("GEMINI_API_KEY")
+
 FILE_NAME = "chat_memory.json"
 
-# Custom CSS for Chat Bubbles and UI
+# Custom CSS for styling the app
 st.markdown("""
 <style>
 
@@ -105,7 +107,6 @@ def load_data():
 def save_data(chat_history):
     new_memory = []
     for message in chat_history:
-        # Gemini history objects have 'role' and 'parts'
         new_memory.append({
             "role": message.role,
             "parts": [{"text": message.parts[0].text}]
