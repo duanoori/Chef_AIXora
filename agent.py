@@ -3,6 +3,7 @@ import google.generativeai as genai
 import os
 import json
 from dotenv import load_dotenv
+import random
 
 # --- CONFIGURATION & SETUP ---
 st.set_page_config(page_title="Chef AI-XORA", page_icon="🍳", layout="centered")
@@ -234,16 +235,16 @@ with st.sidebar:
     st.title("Chef AI-XORA")
     st.markdown("**Strategic Kitchen Assistant**")
     st.divider()
-    
+
     st.info("I help you reduce waste, stay on budget, and cook delicious meals with what's already in your fridge.")
-    
+
     if st.button("🗑️ Clear Chat History", use_container_width=True):
         st.session_state.messages = []
         st.session_state.chat_session = model.start_chat(history=[])
         if os.path.exists(FILE_NAME):
             os.remove(FILE_NAME)
         st.rerun()
-    
+
     st.divider()
     st.caption("Developed & Deployed by:")
     st.markdown("**Dua Noor**")
@@ -271,16 +272,21 @@ if prompt := st.chat_input("What's in your fridge?"):
             try:
                 response = st.session_state.chat_session.send_message(prompt)
                 full_response = response.text
-                
+
                 st.markdown(full_response)
-                
+
                 # Add to State and Save
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 save_data(st.session_state.chat_session.history)
-                
+
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
+# --- DYNAMIC TIP---
+tips = [
+    "Tell Xora your budget & number of servings for custom shopping lists.",
+    "Tell Xora about your allergies or food waste goals for better suggestions."
+]
 # --- FOOTER ---
 st.markdown("---")
-st.caption("Tip: Tell Xora about your allergies or food waste goals for better suggestions.")
+st.caption("Tip: " + random.choice(tips))
