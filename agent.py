@@ -17,23 +17,12 @@ FILE_NAME = "chat_memory.json"
 st.markdown("""
 <style>
 
-/* --- GLOBAL APP --- */
-.main {
-    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-}
-
-/* --- CENTER CHAT CONTAINER --- */
-.block-container {
-    max-width: 750px;
-    padding-top: 2rem;
+/* --- USE SYSTEM THEME --- */
+:root {
+    color-scheme: light dark;
 }
 
 /* --- CHAT BUBBLES --- */
-.stChatMessage {
-    padding: 0;
-    margin-bottom: 12px;
-}
-
 [data-testid="stChatMessageContent"] {
     padding: 12px 16px;
     border-radius: 16px;
@@ -42,38 +31,26 @@ st.markdown("""
     max-width: 85%;
 }
 
-/* USER MESSAGE */
+/* USER MESSAGE (works in both modes) */
 [data-testid="stChatMessage"][data-testid*="user"] [data-testid="stChatMessageContent"] {
-    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    background: linear-gradient(135deg, #fde68a, #fcd34d);
     margin-left: auto;
     border-bottom-right-radius: 4px;
 }
 
-/* AI MESSAGE */
+/* AI MESSAGE (auto adapts) */
 [data-testid="stChatMessage"][data-testid*="assistant"] [data-testid="stChatMessageContent"] {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0,0,0,0.1);
     border-bottom-left-radius: 4px;
 }
 
-/* --- SIDEBAR --- */
-section[data-testid="stSidebar"] {
-    background: #0f172a;
-    border-right: 1px solid #e5e7eb;
-}
-
-/* --- BUTTON --- */
-.stButton button {
-    border-radius: 10px;
-    padding: 10px;
-    border: none;
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: white;
-    font-weight: 500;
-}
-
-.stButton button:hover {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    [data-testid="stChatMessage"][data-testid*="assistant"] [data-testid="stChatMessageContent"] {
+        background: rgba(30, 30, 30, 0.9);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
 }
 
 /* --- INPUT BOX --- */
@@ -81,15 +58,18 @@ section[data-testid="stSidebar"] {
     border-radius: 12px !important;
 }
 
-/* --- TITLE --- */
-h1 {
-    font-weight: 700;
-    letter-spacing: -0.5px;
+/* --- BUTTON --- */
+.stButton button {
+    border-radius: 10px;
+    padding: 10px;
+    border: none;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white;
+    font-weight: 500;
 }
 
-/* --- SUBTLE CARD EFFECT --- */
-[data-testid="stChatMessageContent"] {
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+.stButton button:hover {
+    background: linear-gradient(135deg, #ea580c, #c2410c);
 }
 
 /* --- REMOVE FOOTER --- */
@@ -127,7 +107,7 @@ Your responses should feel complete and useful — not one-liners.
 Aim for balanced detail:
 • Give enough explanation to be helpful
 • Keep it easy to read
-• Do not over-explain or ramble
+• Do not over-explain
 
 Core Behavior:
 
@@ -228,6 +208,8 @@ if "chat_session" not in st.session_state:
     for m in st.session_state.messages:
         gemini_history.append({"role": m["role"], "parts": [m["content"]]})
     st.session_state.chat_session = model.start_chat(history=gemini_history)
+
+
 
 # --- SIDEBAR UI ---
 with st.sidebar:
