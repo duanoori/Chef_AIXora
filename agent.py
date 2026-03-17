@@ -260,7 +260,6 @@ if prompt := st.chat_input("What's in your fridge?"):
         st.markdown(prompt)
 
     # SIMPLE MEMORY / PANTRY UPDATE
-    # -------------------------------
     text = prompt.lower()
 
     # store ingredients
