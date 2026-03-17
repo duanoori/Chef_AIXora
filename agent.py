@@ -9,7 +9,10 @@ import random
 st.set_page_config(page_title="Chef AI-XORA", page_icon="🍳", layout="centered")
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    api_key = os.getenv("GEMINI_API_KEY")
 
 FILE_NAME = "chat_memory.json"
 
